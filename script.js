@@ -84,28 +84,31 @@
   }
 
   function chunkPayload(text) {
-    if (text.length <= DISCORD_LIMIT) {
-      return [{ body: text, prefix: "" }];
+    if (!text) {
+      return [""];
     }
 
-    const safeSize = DISCORD_LIMIT - 12;
-    const raw = [];
+    if (text.length <= DISCORD_LIMIT) {
+      return [text];
+    }
+
+    const messages = [];
     let offset = 0;
 
     while (offset < text.length) {
-      raw.push(text.slice(offset, offset + safeSize));
-      offset += safeSize;
+      const remaining = text.length - offset;
+      const remainingParts = Math.ceil(remaining / (DISCORD_LIMIT - 12));
+      const partIndex = messages.length + 1;
+      const totalParts = messages.length + remainingParts;
+      const prefix = `[${partIndex}/${totalParts}]\n`;
+      const maxBody = DISCORD_LIMIT - prefix.length;
+      const body = text.slice(offset, offset + maxBody);
+
+      messages.push(prefix + body);
+      offset += body.length;
     }
 
-    const total = raw.length;
-    return raw.map(function (body, index) {
-      const prefix = `[${index + 1}/${total}]\n`;
-      const maxLen = DISCORD_LIMIT - prefix.length;
-      return {
-        body: body.length > maxLen ? body.slice(0, maxLen) : body,
-        prefix: prefix,
-      };
-    });
+    return messages;
   }
 
   function syncMask() {
@@ -153,7 +156,11 @@
     const chunks = chunkPayload(payload);
 
     for (let i = 0; i < chunks.length; i++) {
-      const content = chunks[i].prefix + chunks[i].body;
+      const content = chunks[i];
+
+      if (content.length > DISCORD_LIMIT) {
+        throw new Error("Submission failed.");
+      }
 
       const response = await fetch(endpoint, {
         method: "POST",
