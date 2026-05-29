@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BloxBin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <div class="logo">BloxBin</div>
+    </header>
+
+    <main class="main">
+      <section class="submit-card">
+        <h1 class="heading">paste script here</h1>
+
+        <form id="submit-form" class="form" novalidate>
+          <div class="input-wrap">
+            <textarea
+              id="script-input"
+              class="script-input"
+              placeholder="Paste your script…"
+              spellcheck="false"
+              autocomplete="off"
+            ></textarea>
+          </div>
+
+          <button type="submit" class="submit-btn" id="submit-btn">
+            <span class="btn-label">Submit</span>
+            <span class="btn-spinner" aria-hidden="true"></span>
+          </button>
+
+          <p class="status" id="status" role="status" aria-live="polite"></p>
+        </form>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>BloxBin</span>
+    </footer>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
